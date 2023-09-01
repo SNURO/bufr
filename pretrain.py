@@ -162,7 +162,7 @@ def main():
     print("Finished Training.")
 
     # Save model ----------------------------------------------
-    if alg_config["shot_pretrain"]:
+    if data_config["network"] == "DigitCNN" and alg_config["shot_pretrain"]:
         if data_config["dataset_name"] not in ["mnist", "emnist"]:
             raise ValueError("Shot pretraining not available for dataset name {}".format(data_config["dataset_name"]))
         else:

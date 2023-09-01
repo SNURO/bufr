@@ -11,7 +11,7 @@ from nets import add_stats_layers_to_cnn_classifier, add_stats_layers_to_cnn_eve
 import nets_wilds
 from lib.utils import *
 from lib.stats_layers import *
-from lib.data_utils import get_cifar10_dataloaders, get_cifar100_dataloaders, per_hospital_wilds_dataloader
+from lib.data_utils import get_cifar10_dataloaders, get_cifar100_dataloaders, per_hospital_wilds_dataloader, get_cifar10c_dataloaders
 from data.digits import *
 from data.emnist import DynamicEMNIST
 
@@ -35,6 +35,8 @@ FLAGS.add_argument('--pin-mem', action='store_true',
                    help="DataLoader pin_memory")
 FLAGS.add_argument('--cpu', action='store_true',
                    help="Set this to use CPU, default use CUDA")
+FLAGS.add_argument('--class-idx', type=int, default=-1,
+                   help="debug to get classwise statistic")
 
 
 def main():
@@ -66,6 +68,9 @@ def main():
 
     print(alg_config["stats_layer"])
 
+    #MODIFIED : Cifar10c 저장하려고 봤더니 data_config.yml 까지 고치기는 골치아파서 일단 임의로 바꾸고 모델 뽑아냈음
+    data_config["dataset_name"] = 'cifar10c'
+
     # Create folders --------------------------------------------------------
     ckpt_dir = os.path.join(args.output_dir, "ckpts", data_config["dataset_name"])
     mkdir_p(ckpt_dir)
@@ -81,10 +86,18 @@ def main():
         dataloader = DataLoader(ds, batch_size=alg_config["batch_size"], shuffle=False,
                                 num_workers=args.n_workers, pin_memory=args.pin_mem, drop_last=True)
 
+    #MODIFIED: argument에 class_idx 추가. default로 모든 class에 대해 하려면 -1
     elif data_config["dataset_name"] == 'cifar10':
+        #TEMP_0726 dataloader은 원래 처음에 (train_set에 대한), source test data에 대해 실험하려면 _,_,dataloader
         dataloader, _, _ = get_cifar10_dataloaders(args.data_root, alg_config["batch_size"], True,
                                                    args.n_workers, args.pin_mem, train_split=1.,
-                                                   normalize=True)
+                                                   normalize=True, class_idx=args.class_idx)
+    #MODIFIED: 원래 train data에 대해서만 statistic 수집하므로 이런건 없었음
+    #TODO: corruption dataset severity 등 직접 지정해줬음
+    elif data_config["dataset_name"] == 'cifar10c':
+        dataloader, _ = get_cifar10c_dataloaders(args.data_root, "gaussian_noise",5,alg_config["batch_size"], True,
+                                                   args.n_workers, args.pin_mem, train_split=1.,
+                                                   normalize=True, class_idx=args.class_idx)
     elif data_config["dataset_name"] == 'cifar100':
         dataloader, _, _ = get_cifar100_dataloaders(args.data_root, alg_config["batch_size"], True,
                                                     args.n_workers, args.pin_mem, train_split=1.,
@@ -106,8 +119,12 @@ def main():
     elif data_config["network"] == "resnet18":
         learner = ResNet18(n_classes=data_config["total_n_classes"])
         pretr_ckpt_name = get_ckpt_name(alg_config["pretr_epochs"], data_config["network"], args.seed)
-        pretrain_epoch, learner = load_ckpt('pretrain-learner', learner, os.path.join(ckpt_dir, pretr_ckpt_name),
-                                            args.dev)
+        #TEMP0728 : adapted model을 불러오고 싶다
+        # pretrain_epoch, learner = load_ckpt('pretrain-learner', learner, os.path.join(ckpt_dir, pretr_ckpt_name),
+        #                                     args.dev)
+        model_dir = "/home2/wonjae.roh/nprc/bufr/ckpts/cifar10/adapted-learner-0_.pth.tar"
+        pretrain_epoch, learner = load_ckpt('adapted-learner', learner, model_dir,
+                                             args.dev)
         modules_to_track = ['linear']
         module_features_out = [data_config["total_n_classes"]]
         module_features_in = [512]
@@ -151,7 +168,10 @@ def main():
         print("Calibrating bin ranges...")
         for stats_layer in learner_stats_layers:
             stats_layer.track_range = True
-        learner.eval()
+
+        #TEMP0809: to use test statistics, originally learner.eval()
+        
+        learner.train()
         with torch.no_grad():
             for i, data_tuple in enumerate(dataloader):
                 if i >= n_batches:
@@ -166,7 +186,9 @@ def main():
         stats_layer.track_range = False
         stats_layer.track_stats = True
 
-    learner.eval()
+    #TEMP0809: to use test statistics, originally learner.eval()
+    learner.train()
+
     with torch.no_grad():
         for i, data_tuple in enumerate(dataloader):
             if i >= n_batches:
@@ -182,15 +204,25 @@ def main():
         print(stats_layer.bin_edges[:, -2] - stats_layer.bin_edges[:, 1])
 
     # Save model ------------------------------------------------------------
-    save_stats_affixes = [pretr_ckpt_name, stats_layers[0], alg_config["tau"]]
+    if args.class_idx!=-1:
+        save_stats_affixes = [pretr_ckpt_name, stats_layers[0], alg_config["tau"], args.class_idx]
+    else:
+        save_stats_affixes = [pretr_ckpt_name, stats_layers[0], alg_config["tau"]]
     # For adding stats layers everywhere, e.g. to make the max patches figure, use the below
     # save_stats_affixes = [pretr_ckpt_name, stats_layers[0], alg_config["tau"], "all"]
+
+    #TEMP_0726 ignore below, 기존 cifar10 폴더로 설정된 ckpt_dir에서 ckpt 불러오는 등 전까지는 동일하나 저장경로만 변경하기 위함
+    ckpt_dir = os.path.join(args.output_dir, "ckpts", "cifar10c")
+    mkdir_p(ckpt_dir)
+
     ckpt_path = save_ckpt(ckpt_dir, "pretrain-learner", learner, None, pretrain_epoch, *save_stats_affixes)
     if "camelyon" in data_config["dataset_name"]:
         print("Used hospital {}".format(alg_config["hospital_idx"]))
     print("Saved model ckpt to {0}".format(ckpt_path))
 
     # Joint Gaussian mean and covariance ------------------------------------------------------------
+
+    #MEMO: 왜인지 모르지만 이건 mnist계열의 dataset에서만 함
     if data_config["network"] == "DigitCNN":
         print("Calculating Full Gauss. stats")
         hooked_modules = hook_linears(learner)

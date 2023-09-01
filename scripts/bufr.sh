@@ -1,12 +1,13 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES="5"
+export CUDA_VISIBLE_DEVICES="0"
 
-python bufr.py      --data-root ./datasets/ \
+python bufr.py      --data-root /gallery_tate/wonjae.roh/ \
                     --output-dir ./ \
-                    --alg-configs-dir ./configs/EMNIST-DA/ \
-                    --data-config ./configs/EMNIST-DA/dataset.yml \
+                    --alg-configs-dir ./configs/CIFAR-10-C/ \
+                    --data-config ./configs/CIFAR-10-C/dataset.yml \
                     --seed 123 \
                     --deterministic \
                     --n-workers 4 \
-                    --pin-mem
+                    --pin-mem \
+                    --save-adapted-model

@@ -2,7 +2,7 @@
 
 export CUDA_VISIBLE_DEVICES="1"
 
-python adapt.py     --data-root ./datasets/ \
+python adapt.py     --data-root /gallery_tate/wonjae.roh/ \
                     --output-dir ./ \
                     --alg-configs-dir ./configs/EMNIST-DA/ \
                     --data-config ./configs/EMNIST-DA/dataset.yml \

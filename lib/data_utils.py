@@ -108,6 +108,24 @@ def per_class_subset(dataset, n_samples_per_class=5):
 
     return new_ds
 
+#MODIFIED : dataset을 받아서 특정 class의 data와 target만 갖도록 바꿔서 return
+def reduce_classwise_subset(dataset, class_idx):
+    targets = np.array(dataset.targets)
+    class_indices = targets==class_idx
+    dataset.data = dataset.data[class_indices]
+    dataset.targets = list(targets[class_indices])
+
+def reduce_classwise_subset_c(dataset, class_idx):
+    targets = dataset.tensors[1]
+    data = dataset.tensors[0]
+    class_indices = targets==class_idx
+    new_data = data[class_indices]
+    new_target = targets[class_indices]
+    new_tuple = (new_data, new_target)
+    dataset.tensors = new_tuple
+
+
+
 
 def get_dynamic_emnist_dataloaders(dataset_path, keep_classes, batch_size, shuffle, n_workers, pin_mem):
     tr_ds = DynamicEMNIST(dataset_path, norm=True, color=True, which_set='train',
@@ -320,8 +338,8 @@ def per_hospital_wilds_dataloader_fewshot(dataset_path, hospital_idx, n_samples_
 
     return loader
 
-
-def get_cifar10_dataloaders(dataset_path, batch_size, shuffle, n_workers, pin_mem, train_split=0.9, normalize=True):
+#return only class subset dataloader if class_idx specified (not -1)
+def get_cifar10_dataloaders(dataset_path, batch_size, shuffle, n_workers, pin_mem, train_split=0.9, normalize=True, class_idx=-1):
     # Setup
     assert 0.75 < train_split <= 1.
     ds_path = os.path.join(dataset_path, "CIFAR-10")
@@ -344,6 +362,11 @@ def get_cifar10_dataloaders(dataset_path, batch_size, shuffle, n_workers, pin_me
     # Load datasets
     tr_ds = torchvision.datasets.CIFAR10(ds_path, train=True, transform=transform_train, download=True)
     tst_ds = torchvision.datasets.CIFAR10(ds_path, train=False, transform=transform_test, download=True)
+
+    if class_idx != -1:
+        reduce_classwise_subset(tr_ds, class_idx)
+        reduce_classwise_subset(tst_ds, class_idx)
+
 
     #  Train, valid set split via Subset()
     tr_ds, val_ds = train_test_split_subset(tr_ds, train_split, shuffle)
@@ -396,13 +419,13 @@ def get_cifar100_dataloaders(dataset_path, batch_size, shuffle, n_workers, pin_m
 
     return tr_loader, val_loader, tst_loader
 
-
+#return only class subset dataloader if class_idx specified (not -1) (not checked)
 def get_cifar10c_dataloaders(dataset_path, corruption_name, severity, batch_size, shuffle, n_workers, pin_mem,
-                             train_split=1., normalize=True):
+                             train_split=1., normalize=True, class_idx=-1):
     # Setup
     assert 1 <= severity <= 5
     assert 0.7 < train_split <= 1.
-    ds_path = os.path.join(dataset_path, "CIFAR-10-C/")
+    ds_path = os.path.join(dataset_path, "cifar10c/")
     n_total_cifar = 10000
 
     # Load data
@@ -424,6 +447,9 @@ def get_cifar10c_dataloaders(dataset_path, corruption_name, severity, batch_size
 
     # Create Tensor dataset
     ds = torch.utils.data.TensorDataset(xs, ys)
+
+    if class_idx != -1:
+        reduce_classwise_subset_c(ds, class_idx)
 
     # Train, valid set split via Subset()
     if train_split <= 0.8:               # Create proper train, val, test splits

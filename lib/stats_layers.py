@@ -389,6 +389,7 @@ class MomentStats2D(MomentStats, Layer2D):
 class BinStats(StatsLayer):
     """
         Module to track the unit activation distributions of a layer with bins.
+        MEMO: register_buffer는 backprop등을 수행하지 않고 단순히 값을 저장하기 위해 사용 
     """
     def __init__(self, n_features, eps=1e-5, momentum=0.9, rng=None, track_stats=False,
                  calc_surprise=False, track_range=False, n_bins=8, surprise_score="PSI", cpu=True, norm_range=True):

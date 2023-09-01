@@ -21,7 +21,7 @@ def get_learner_param_layers(model):
             param_layers.append(m)
     return layer_names, param_layers
 
-
+#question: 이건 어디다 쓰는거지?
 def learner_distances(init_learner, final_learner, distance_type="mean", zero_atol=1e-4, ret_layer_names=False,
                       is_tracked_net=True):
     """
@@ -409,7 +409,7 @@ def ResNet18(n_classes=10):
 def ResNet34(n_classes=10):
     return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=n_classes)
 
-
+#50layer가 아닌뎅? Bottleneck 이라 그런듯. depth가 깊어지면 basicblock 대신 bottleneck 사용
 def ResNet50(n_classes=10):
     return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=n_classes)
 

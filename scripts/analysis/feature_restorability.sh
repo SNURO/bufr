@@ -3,7 +3,7 @@
 export CUDA_VISIBLE_DEVICES="1"
 export PYTHONPATH="/home/ian/meta-lstm/"
 
-python analysis/feature_restorability.py  --data-root ./datasets/ \
+python analysis/feature_restorability.py  --data-root /gallery_tate/wonjae.roh/ \
                                           --output-dir ./ \
                                           --alg-config ./configs/EMNIST-DA/feature_restorability.yml \
                                           --data-config ./configs/EMNIST-DA/dataset.yml \
